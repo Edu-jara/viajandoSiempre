@@ -5,7 +5,7 @@ import { useViaje } from '../../context/ViajeContext';
 const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
     const { participantes, agregarParticipante, sincronizarUsuarioEnGrupo } = useViaje();
 
-    // 1. TODOS LOS ESTADOS AL PRINCIPIO (Incluyendo el estado para editar el perfil)
+    // 1. TODOS LOS ESTADOS AL PRINCIPIO
     const [formData, setFormData] = useState(() => {
         return viajeState || {
             nombreViaje: '',
@@ -27,7 +27,6 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
         fotoPerfil: ''
     });
 
-    // Estado para alternar entre ver la tarjeta de perfil "apagada" o editarla activamente
     const [isEditandoPerfil, setIsEditandoPerfil] = useState(false);
 
     // 2. TODAS LAS REFERENCIAS (useRef) AL PRINCIPIO
@@ -109,7 +108,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
         setNuevoAmigo({ nombre: '', apellido: '', apodo: '', fotoPerfil: '' });
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
         try {
@@ -132,13 +131,18 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                     usuario: usuarioConId
                 };
 
-                onGuardar(viajeActualizado);
+                if (typeof onGuardar === 'function') {
+                    await onGuardar(viajeActualizado);
+                }
 
+                // Blindaje por si sincronizarUsuarioEnGrupo no está definido en algún contexto temporal
                 if (typeof sincronizarUsuarioEnGrupo === 'function') {
-                    sincronizarUsuarioEnGrupo(usuarioConId);
+                    await sincronizarUsuarioEnGrupo(usuarioConId);
                 }
             } else {
-                onGuardar(formData);
+                if (typeof onGuardar === 'function') {
+                    await onGuardar(formData);
+                }
             }
 
             onClose();
@@ -181,7 +185,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                 {/* Contenido con Scroll Custom */}
                 <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
 
-                    {/* FORMULARIO PRINCIPAL (SECCIONES 1 Y 2 + BOTÓN GUARDAR) */}
+                    {/* FORMULARIO PRINCIPAL */}
                     <form onSubmit={handleSubmit} className="space-y-6">
                         
                         {/* SECCIÓN 1: DATOS DEL VIAJE */}
@@ -202,7 +206,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                     name="nombreViaje"
                                     value={formData?.nombreViaje || ''}
                                     onChange={handleChange}
-                                    placeholder="Ej: México 2027..."
+                                    placeholder="Ej: Mendoza 2026..."
                                     className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-sm font-medium focus:outline-none focus:border-amber-500 transition-all"
                                     required
                                 />
@@ -238,7 +242,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                             </div>
                         </div>
 
-                        {/* SECCIÓN 2: PERFIL DE USUARIO (Con modo Lectura / Edición) */}
+                        {/* SECCIÓN 2: PERFIL DE USUARIO */}
                         <div className="bg-zinc-950/50 border border-zinc-800/70 rounded-2xl p-4 sm:p-5 space-y-4">
                             <div className="flex items-center justify-between pb-3 border-b border-zinc-800/60">
                                 <div className="flex items-center gap-2">
