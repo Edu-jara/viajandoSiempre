@@ -5,21 +5,27 @@ import { useViaje } from '../../context/ViajeContext';
 const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
     const { participantes, agregarParticipante, sincronizarUsuarioEnGrupo } = useViaje();
 
-    // 1. TODOS LOS ESTADOS AL PRINCIPIO
-    const [formData, setFormData] = useState(() => {
-        return viajeState || {
-            nombreViaje: '',
-            portadaViaje: '',
-            usuario: {
-                id: `user_${Date.now()}`,
-                nombre: '',
-                apellido: '',
-                apodo: '',
-                fotoPerfil: ''
-            }
-        };
-    });
-    
+    const defaultFormData = {
+        nombreViaje: '',
+        portadaViaje: '',
+        usuario: {
+            id: `user_${Date.now()}`,
+            nombre: '',
+            apellido: '',
+            apodo: '',
+            fotoPerfil: ''
+        }
+    };
+
+    const [formData, setFormData] = useState(() => ({
+        ...defaultFormData,
+        ...(viajeState || {}),
+        usuario: {
+            ...defaultFormData.usuario,
+            ...(viajeState?.usuario || {})
+        }
+    }));
+
     const [nuevoAmigo, setNuevoAmigo] = useState({
         nombre: '',
         apellido: '',
@@ -35,12 +41,17 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
     const fileInputAmigoRef = useRef(null);
 
     useEffect(() => {
-        if (isOpen && viajeState) {
-            setFormData(viajeState);
+        if (isOpen) {
+            setFormData({
+                ...defaultFormData,
+                ...(viajeState || {}),
+                usuario: {
+                    ...defaultFormData.usuario,
+                    ...(viajeState?.usuario || {})
+                }
+            });
         }
     }, [isOpen, viajeState]);
-
-    if (!isOpen) return null;
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -116,7 +127,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
 
             if (usuarioActual?.nombre && usuarioActual.nombre.trim() !== '') {
                 const usuarioIdFinal = usuarioActual.id || `local_user_${Date.now()}`;
-                
+
                 const usuarioConId = {
                     ...usuarioActual,
                     id: usuarioIdFinal,
@@ -154,14 +165,14 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
 
     return (
         <div className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md transition-opacity">
-            
+
             {/* Inputs de archivos ocultos */}
             <input type="file" ref={fileInputPortadaRef} onChange={handlePortadaChange} accept="image/*" className="hidden" />
             <input type="file" ref={fileInputPerfilRef} onChange={handlePerfilChange} accept="image/*" className="hidden" />
             <input type="file" ref={fileInputAmigoRef} onChange={handleAmigoFotoChange} accept="image/*" className="hidden" />
 
             <div className="w-full max-w-lg max-h-[85vh] bg-zinc-900 border border-zinc-800 rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200 mb-2 sm:mb-0">
-                
+
                 {/* Header Superior Fijo */}
                 <div className="flex items-center justify-between px-6 py-4 bg-zinc-900/90 border-b border-zinc-800/80 backdrop-blur-md shrink-0">
                     <div className="flex items-center gap-3">
@@ -187,7 +198,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
 
                     {/* FORMULARIO PRINCIPAL */}
                     <form onSubmit={handleSubmit} className="space-y-6">
-                        
+
                         {/* SECCIÓN 1: DATOS DEL VIAJE */}
                         <div className="bg-zinc-950/50 border border-zinc-800/70 rounded-2xl p-4 sm:p-5 space-y-4">
                             <div className="flex items-center gap-2 pb-3 border-b border-zinc-800/60">
@@ -274,7 +285,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                             {!isEditandoPerfil ? (
                                 <div className="flex items-center justify-between p-3 bg-zinc-900/80 border border-zinc-800 rounded-2xl">
                                     <div className="flex items-center gap-3.5">
-                                        <div 
+                                        <div
                                             className="w-12 h-12 rounded-xl bg-zinc-800 border border-emerald-500/30 overflow-hidden flex items-center justify-center text-sm font-black text-emerald-400 bg-cover bg-center shrink-0 shadow-sm"
                                             style={{
                                                 backgroundImage: formData?.usuario?.fotoPerfil ? `url("${formData.usuario.fotoPerfil}")` : undefined
@@ -284,7 +295,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                         </div>
                                         <div>
                                             <p className="text-xs font-bold text-white">
-                                                {formData?.usuario?.nombre ? `${formData.usuario.nombre} ${formData.usuario.apellido || ''}` : 'Sin configurar'} 
+                                                {formData?.usuario?.nombre ? `${formData.usuario.nombre} ${formData.usuario.apellido || ''}` : 'Sin configurar'}
                                                 {formData?.usuario?.apodo ? <span className="text-emerald-400 ml-1">({formData.usuario.apodo})</span> : ''}
                                             </p>
                                             <p className="text-[11px] text-zinc-400">
@@ -296,7 +307,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                             ) : (
                                 <div className="space-y-4 animate-in fade-in duration-200">
                                     <div className="flex items-center gap-4 py-1">
-                                        <div 
+                                        <div
                                             onClick={() => fileInputPerfilRef.current?.click()}
                                             className="w-16 h-16 rounded-2xl bg-zinc-900 border-2 border-emerald-500/50 overflow-hidden cursor-pointer relative group flex items-center justify-center shrink-0 bg-cover bg-center transition-all hover:border-emerald-400"
                                             style={{
@@ -350,7 +361,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                             className="w-full px-3.5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-emerald-500"
                                         />
                                     </div>
-                                    
+
                                     <button
                                         type="button"
                                         onClick={() => setIsEditandoPerfil(false)}
@@ -385,7 +396,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
 
                         <div className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl p-3.5 space-y-3">
                             <div className="flex items-center gap-3">
-                                <div 
+                                <div
                                     onClick={() => fileInputAmigoRef.current?.click()}
                                     className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 overflow-hidden cursor-pointer relative group flex items-center justify-center shrink-0 bg-cover bg-center transition-all hover:border-amber-500"
                                     style={{
@@ -439,7 +450,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                             {participantes.map((p, index) => (
                                 <div key={p.id || index} className="flex items-center justify-between p-2.5 bg-zinc-900/60 border border-zinc-800 rounded-xl">
                                     <div className="flex items-center gap-2.5">
-                                        <div 
+                                        <div
                                             className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center text-[11px] font-bold text-amber-400 bg-cover bg-center shrink-0"
                                             style={{
                                                 backgroundImage: p.fotoPerfil ? `url("${p.fotoPerfil}")` : undefined
