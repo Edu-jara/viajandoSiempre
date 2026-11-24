@@ -5,6 +5,11 @@ import { ArrowRight, ShieldCheck, PieChart, SendHorizonal } from 'lucide-react';
 const Balances = () => {
     const { totalGastos, cuotaPorPersona, balanceParticipantes, pagosSugeridos } = useViaje();
 
+    console.log(
+        'DEBUG participantes:',
+        balanceParticipantes.map((p) => `${p.nombre} | alias="${p.alias || ''}" | desc="${p.descripcion || ''}"`)
+    );
+
     return (
         <div className="space-y-6 pb-6">
 
@@ -80,23 +85,54 @@ const Balances = () => {
                     {balanceParticipantes.map((p, index) => {
                         const esAcreedor = p.saldo > 0.01;
                         const esDeudor = p.saldo < -0.01;
+                        const aliasLimpio = (p.alias || '').trim();
+                        const descLimpia = (p.descripcion || '').trim();
+                        const infoCobro = [aliasLimpio, descLimpia].filter(Boolean).join(' · ');
+
+                        const copiarAlias = () => {
+                            if (!aliasLimpio || !navigator?.clipboard) return;
+                            navigator.clipboard.writeText(aliasLimpio);
+                        };
 
                         return (
-                            <div key={index} className="bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-3.5 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div 
+                            <div
+                                key={p.id || index}
+                                className="bg-zinc-900/40 border border-zinc-800/60 rounded-xl p-3.5 flex items-center justify-between gap-3"
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div
                                         className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center text-xs font-bold text-amber-400 bg-cover bg-center shrink-0"
                                         style={{ backgroundImage: p.fotoPerfil ? `url("${p.fotoPerfil}")` : undefined }}
                                     >
                                         {!p.fotoPerfil && (p.nombre ? p.nombre.charAt(0).toUpperCase() : 'U')}
                                     </div>
-                                    <div>
-                                        <p className="text-xs font-semibold text-zinc-100">{p.nombre} {p.apellido || ''}</p>
-                                        <p className="text-[11px] text-zinc-400">Pagó: <span className="text-zinc-200 font-medium">${p.totalPagado.toLocaleString()} USD</span></p>
+                                    <div className="min-w-0">
+                                        <p className="text-xs font-semibold text-zinc-100 truncate">
+                                            {p.nombre} {p.apellido || ''}
+                                        </p>
+                                        <p className="text-[11px] text-zinc-400">
+                                            Pagó: <span className="text-zinc-200 font-medium">${p.totalPagado.toLocaleString()} USD</span>
+                                        </p>
+                                        {infoCobro && (
+                                            <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[11px] text-amber-300/90 font-medium truncate">
+                                                    {infoCobro}
+                                                </span>
+                                                {aliasLimpio && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={copiarAlias}
+                                                        className="px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 cursor-pointer transition-colors"
+                                                    >
+                                                        Copiar alias
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
-                                <div className="text-right">
+                                <div className="text-right shrink-0">
                                     {esAcreedor && (
                                         <span className="inline-block px-2 py-0.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-bold">
                                             Le deben +${p.saldo.toFixed(2)}

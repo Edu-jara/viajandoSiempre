@@ -15,12 +15,14 @@ const DashboardContent = () => {
   // Extraemos del contexto global lo que necesitamos
   const { viajeState, isConfigOpen, setIsConfigOpen, guardarConfiguracion } = useViaje();
 
-  // Onboarding automático: si no hay nombre al arrancar, abre el modal solo una vez
+  const onboardingCheckedRef = React.useRef(false);
+
   useEffect(() => {
-    if (!viajeState.usuario?.nombre) {
+    if (!onboardingCheckedRef.current && !viajeState?.usuario?.nombre) {
+      onboardingCheckedRef.current = true;
       setIsConfigOpen(true);
     }
-  }, [viajeState, setIsConfigOpen]);
+  }, [viajeState?.usuario?.nombre, setIsConfigOpen]);
 
   return (
     <>

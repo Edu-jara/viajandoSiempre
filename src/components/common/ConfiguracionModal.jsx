@@ -1,9 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Camera, MapPin, User, Check, Compass, Users, UserPlus } from 'lucide-react';
+import { X, Camera, MapPin, User, Check, Compass, Users, UserPlus, RotateCcw } from 'lucide-react';
 import { useViaje } from '../../context/ViajeContext';
+import { subirImagenACloudinary } from '../../utils/cloudinary';
 
 const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
-    const { participantes, agregarParticipante, sincronizarUsuarioEnGrupo } = useViaje();
+    const {
+        participantes,
+        agregarParticipante,
+        sincronizarUsuarioEnGrupo,
+        reiniciarViaje
+    } = useViaje();
 
     const defaultFormData = {
         nombreViaje: '',
@@ -13,6 +19,8 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
             nombre: '',
             apellido: '',
             apodo: '',
+            alias: '',
+            descripcion: '',
             fotoPerfil: ''
         }
     };
@@ -30,15 +38,20 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
         nombre: '',
         apellido: '',
         apodo: '',
+        alias: '',
+        descripcion: '',
         fotoPerfil: ''
     });
 
+    const [nombreNuevoViaje, setNombreNuevoViaje] = useState('');
     const [isEditandoPerfil, setIsEditandoPerfil] = useState(false);
 
     // 2. TODAS LAS REFERENCIAS (useRef) AL PRINCIPIO
     const fileInputPortadaRef = useRef(null);
     const fileInputPerfilRef = useRef(null);
     const fileInputAmigoRef = useRef(null);
+
+    const [subiendoFoto, setSubiendoFoto] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -53,9 +66,11 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
         }
     }, [isOpen, viajeState]);
 
+    if (!isOpen) return null;
+
     const handleChange = (e) => {
         const { name, value } = e.target;
-        if (['nombre', 'apellido', 'apodo'].includes(name)) {
+        if (['nombre', 'apellido', 'apodo', 'alias', 'descripcion'].includes(name)) {
             setFormData(prev => ({
                 ...prev,
                 usuario: { ...(prev?.usuario || {}), [name]: value }
@@ -65,64 +80,121 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
         }
     };
 
-    const handlePerfilChange = (e) => {
+    const handlePerfilChange = async (e) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData(prev => ({
-                    ...prev,
-                    usuario: {
-                        ...(prev?.usuario || {}),
-                        fotoPerfil: reader.result
-                    }
-                }));
-            };
-            reader.readAsDataURL(file);
+        if (!file) return;
+
+        setSubiendoFoto(true);
+        try {
+            const urlPerfil = await subirImagenACloudinary(file, "viajando-siempre/perfiles");
+            setFormData(prev => ({
+                ...prev,
+                usuario: {
+                    ...(prev?.usuario || {}),
+                    fotoPerfil: urlPerfil
+                }
+            }));
+        } catch (error) {
+            console.error("Error al subir la foto de perfil a Cloudinary:", error);
+            alert("No se pudo subir la foto de perfil. Probá de nuevo.");
+        } finally {
+            setSubiendoFoto(false);
+            e.target.value = "";
         }
     };
 
-    const handlePortadaChange = (e) => {
+    const handlePortadaChange = async (e) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData(prev => ({ ...prev, portadaViaje: reader.result }));
-            };
-            reader.readAsDataURL(file);
+        if (!file) return;
+
+        setSubiendoFoto(true);
+        try {
+            const urlPortada = await subirImagenACloudinary(file, "viajando-siempre/portadas");
+            setFormData(prev => ({ ...prev, portadaViaje: urlPortada }));
+        } catch (error) {
+            console.error("Error al subir la portada a Cloudinary:", error);
+            alert("No se pudo subir la imagen de portada. Probá de nuevo.");
+        } finally {
+            setSubiendoFoto(false);
+            e.target.value = "";
         }
     };
 
-    const handleAmigoFotoChange = (e) => {
+    const handleAmigoFotoChange = async (e) => {
         const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setNuevoAmigo(prev => ({ ...prev, fotoPerfil: reader.result }));
-            };
-            reader.readAsDataURL(file);
+        if (!file) return;
+
+        setSubiendoFoto(true);
+        try {
+            const urlAmigo = await subirImagenACloudinary(file, "viajando-siempre/integrantes");
+            setNuevoAmigo(prev => ({ ...prev, fotoPerfil: urlAmigo }));
+        } catch (error) {
+            console.error("Error al subir la foto del integrante a Cloudinary:", error);
+            alert("No se pudo subir la foto del integrante. Probá de nuevo.");
+        } finally {
+            setSubiendoFoto(false);
+            e.target.value = "";
         }
     };
 
-    const handleSumarAmigo = (e) => {
+    const handleSumarAmigo = async (e) => {
         e.preventDefault();
         if (!nuevoAmigo.nombre.trim()) {
             alert('Por lo menos ingresa el nombre del integrante');
             return;
         }
 
-        agregarParticipante({
-            id: `user_${Date.now()}`,
-            ...nuevoAmigo
+        await agregarParticipante({
+            id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            nombre: nuevoAmigo.nombre.trim(),
+            apellido: (nuevoAmigo.apellido || '').trim(),
+            apodo: (nuevoAmigo.apodo || '').trim(),
+            alias: (nuevoAmigo.alias || '').trim(),
+            descripcion: (nuevoAmigo.descripcion || '').trim(),
+            fotoPerfil: nuevoAmigo.fotoPerfil || ''
         });
 
-        setNuevoAmigo({ nombre: '', apellido: '', apodo: '', fotoPerfil: '' });
+        setNuevoAmigo({
+            nombre: '',
+            apellido: '',
+            apodo: '',
+            alias: '',
+            descripcion: '',
+            fotoPerfil: ''
+        });
+    };
+
+    const handleReiniciarClick = async () => {
+        if (typeof reiniciarViaje !== 'function') return;
+        const nombreAUsar = nombreNuevoViaje.trim() || 'Nuevo Viaje';
+        await reiniciarViaje(nombreAUsar);
+        setNombreNuevoViaje('');
+        onClose();
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-
         try {
+            if (nuevoAmigo?.nombre?.trim()) {
+                await agregarParticipante({
+                    id: `user_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                    nombre: nuevoAmigo.nombre.trim(),
+                    apellido: (nuevoAmigo.apellido || '').trim(),
+                    apodo: (nuevoAmigo.apodo || '').trim(),
+                    alias: (nuevoAmigo.alias || '').trim(),
+                    descripcion: (nuevoAmigo.descripcion || '').trim(),
+                    fotoPerfil: nuevoAmigo.fotoPerfil || ''
+                });
+                setNuevoAmigo({
+                    nombre: '',
+                    apellido: '',
+                    apodo: '',
+                    alias: '',
+                    descripcion: '',
+                    fotoPerfil: ''
+                });
+            }
+
             const usuarioActual = formData?.usuario;
 
             if (usuarioActual?.nombre && usuarioActual.nombre.trim() !== '') {
@@ -134,6 +206,8 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                     nombre: usuarioActual.nombre.trim(),
                     apellido: (usuarioActual.apellido || '').trim(),
                     apodo: (usuarioActual.apodo || '').trim(),
+                    alias: (usuarioActual.alias || '').trim(),
+                    descripcion: (usuarioActual.descripcion || '').trim(),
                     fotoPerfil: usuarioActual.fotoPerfil || ''
                 };
 
@@ -146,7 +220,6 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                     await onGuardar(viajeActualizado);
                 }
 
-                // Blindaje por si sincronizarUsuarioEnGrupo no está definido en algún contexto temporal
                 if (typeof sincronizarUsuarioEnGrupo === 'function') {
                     await sincronizarUsuarioEnGrupo(usuarioConId);
                 }
@@ -301,6 +374,11 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                             <p className="text-[11px] text-zinc-400">
                                                 {formData?.usuario?.nombre ? 'Perfil activo y guardado' : 'Toca "Editar Perfil" para registrar tus datos'}
                                             </p>
+                                            {(formData?.usuario?.alias || formData?.usuario?.descripcion) && (
+                                                <p className="text-[11px] text-emerald-300/90 mt-0.5">
+                                                    {[formData.usuario.alias, formData.usuario.descripcion].filter(Boolean).join(' · ')}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
@@ -350,14 +428,39 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                         </div>
                                     </div>
 
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Apodo (Cómo te llaman)</label>
+                                            <input
+                                                type="text"
+                                                name="apodo"
+                                                value={formData?.usuario?.apodo || ''}
+                                                onChange={handleChange}
+                                                placeholder="Ej: Charly, Tano..."
+                                                className="w-full px-3.5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-emerald-500"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Alias para transferencias</label>
+                                            <input
+                                                type="text"
+                                                name="alias"
+                                                value={formData?.usuario?.alias || ''}
+                                                onChange={handleChange}
+                                                placeholder="Ej: eduardo.73.jara"
+                                                className="w-full px-3.5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-emerald-500"
+                                            />
+                                        </div>
+                                    </div>
+
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Apodo (Cómo te llaman)</label>
+                                        <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Descripción / Banco o Billetera</label>
                                         <input
                                             type="text"
-                                            name="apodo"
-                                            value={formData?.usuario?.apodo || ''}
+                                            name="descripcion"
+                                            value={formData?.usuario?.descripcion || ''}
                                             onChange={handleChange}
-                                            placeholder="Ej: Charly, Tano..."
+                                            placeholder="Ej: Banco Provincia, Mercado Pago, Cuenta DNI..."
                                             className="w-full px-3.5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-emerald-500"
                                         />
                                     </div>
@@ -377,6 +480,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                         <div>
                             <button
                                 type="submit"
+                                disabled={subiendoFoto}
                                 className="w-full py-4 bg-gradient-to-r from-emerald-500 to-emerald-400 hover:from-emerald-400 hover:to-emerald-300 text-zinc-950 font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
                             >
                                 <Check className="w-4 h-4 stroke-[3]" /> Guardar Cambios y Continuar
@@ -428,18 +532,38 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                 </div>
                             </div>
 
-                            <div className="flex gap-2">
+                            <div className="space-y-2.5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    <input
+                                        type="text"
+                                        value={nuevoAmigo.apodo || ''}
+                                        onChange={(e) => setNuevoAmigo(prev => ({ ...prev, apodo: e.target.value }))}
+                                        placeholder="Apodo (Ej: Tano, Colo...)"
+                                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-amber-500"
+                                    />
+
+                                    <input
+                                        type="text"
+                                        value={nuevoAmigo.alias || ''}
+                                        onChange={(e) => setNuevoAmigo(prev => ({ ...prev, alias: e.target.value }))}
+                                        placeholder="Alias (Ej: eduardo.73.jara)"
+                                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-amber-500"
+                                    />
+                                </div>
+
                                 <input
                                     type="text"
-                                    value={nuevoAmigo.apodo}
-                                    onChange={(e) => setNuevoAmigo(prev => ({ ...prev, apodo: e.target.value }))}
-                                    placeholder="Apodo (Ej: Tano, Colo...)"
-                                    className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-amber-500"
+                                    value={nuevoAmigo.descripcion || ''}
+                                    onChange={(e) => setNuevoAmigo(prev => ({ ...prev, descripcion: e.target.value }))}
+                                    placeholder="Descripción (Ej: Banco Provincia, MP...)"
+                                    className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-amber-500"
                                 />
+
                                 <button
                                     type="button"
                                     onClick={handleSumarAmigo}
-                                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-zinc-950 font-black text-xs uppercase rounded-xl flex items-center gap-1 cursor-pointer transition-all shrink-0"
+                                    disabled={subiendoFoto}
+                                    className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-zinc-950 font-black text-xs uppercase rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition-all"
                                 >
                                     <UserPlus className="w-4 h-4" /> Sumar
                                 </button>
@@ -447,26 +571,66 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                         </div>
 
                         <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
-                            {participantes.map((p, index) => (
-                                <div key={p.id || index} className="flex items-center justify-between p-2.5 bg-zinc-900/60 border border-zinc-800 rounded-xl">
-                                    <div className="flex items-center gap-2.5">
-                                        <div
-                                            className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center text-[11px] font-bold text-amber-400 bg-cover bg-center shrink-0"
-                                            style={{
-                                                backgroundImage: p.fotoPerfil ? `url("${p.fotoPerfil}")` : undefined
-                                            }}
-                                        >
-                                            {!p.fotoPerfil && (p.nombre ? p.nombre.charAt(0).toUpperCase() : 'U')}
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-semibold text-zinc-200">
-                                                {p.nombre} {p.apellido || ''} {p.apodo ? `("${p.apodo}")` : ''}
-                                            </p>
+                            {participantes.map((p, index) => {
+                                const detallePago = [p.alias, p.descripcion].filter(Boolean).join(' · ');
+
+                                return (
+                                    <div key={p.id || index} className="flex items-center justify-between p-2.5 bg-zinc-900/60 border border-zinc-800 rounded-xl">
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                            <div
+                                                className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 overflow-hidden flex items-center justify-center text-[11px] font-bold text-amber-400 bg-cover bg-center shrink-0"
+                                                style={{
+                                                    backgroundImage: p.fotoPerfil ? `url("${p.fotoPerfil}")` : undefined
+                                                }}
+                                            >
+                                                {!p.fotoPerfil && (p.nombre ? p.nombre.charAt(0).toUpperCase() : 'U')}
+                                            </div>
+                                            <div className="min-w-0">
+                                                <p className="text-xs font-semibold text-zinc-200 truncate">
+                                                    {p.nombre} {p.apellido || ''} {p.apodo ? `("${p.apodo}")` : ''}
+                                                </p>
+                                                {detallePago && (
+                                                    <p className="text-[11px] text-zinc-400 truncate">
+                                                        {detallePago}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
+                    </div>
+
+                    {/* SECCIÓN 4: REINICIAR / NUEVO VIAJE */}
+                    <div className="bg-red-950/20 border border-red-900/40 rounded-2xl p-4 sm:p-5 space-y-3">
+                        <div className="flex items-center gap-2 pb-2 border-b border-red-900/30">
+                            <RotateCcw className="w-4 h-4 text-red-400" />
+                            <h3 className="text-xs font-extrabold text-red-400 uppercase tracking-widest">
+                                4. Reiniciar o Empezar Otro Viaje
+                            </h3>
+                        </div>
+
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">
+                            Borra todos los gastos e integrantes compartidos en el grupo para arrancar de cero o pasar a un próximo viaje.
+                        </p>
+
+                        <input
+                            type="text"
+                            value={nombreNuevoViaje}
+                            onChange={(e) => setNombreNuevoViaje(e.target.value)}
+                            placeholder="Nombre del próximo viaje (opcional)"
+                            className="w-full px-3.5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-red-500"
+                        />
+
+                        <button
+                            type="button"
+                            onClick={handleReiniciarClick}
+                            disabled={subiendoFoto}
+                            className="w-full py-3 bg-red-500/15 hover:bg-red-500/25 disabled:opacity-50 border border-red-500/40 text-red-300 font-black text-xs uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                            <RotateCcw className="w-4 h-4" /> Reiniciar Viaje Compartido
+                        </button>
                     </div>
 
                 </div>
