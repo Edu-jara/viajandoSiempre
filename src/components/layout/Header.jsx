@@ -8,7 +8,12 @@ const Header = ({
     onAbrirConfiguracion
 }) => {
     return (
-        <header className="w-full px-4 pt-4">
+        <header
+            className="w-full px-4 pb-2"
+            style={{
+                paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)'
+            }}
+        >
             <div 
                 className="relative w-full h-[180px] rounded-3xl overflow-hidden shadow-2xl flex flex-col justify-between p-4 bg-zinc-900 transition-all duration-300"
                 style={{ 
@@ -32,12 +37,14 @@ const Header = ({
 
                     <div className="flex items-center gap-2">
                         {/* Botón de Configuración / Ajustes */}
-                        <button 
+                        <button
+                            type="button"
                             onClick={onAbrirConfiguracion}
-                            className="p-2 rounded-full bg-zinc-950/70 backdrop-blur-md border border-zinc-700/60 text-zinc-200 hover:bg-zinc-800 transition-all shadow-md active:scale-95 flex items-center justify-center"
+                            className="relative z-30 p-2.5 rounded-full bg-zinc-950/80 backdrop-blur-md border border-zinc-700/60 text-zinc-200 hover:bg-zinc-800 transition-all shadow-md active:scale-95 flex items-center justify-center touch-manipulation"
                             title="Configurar viaje y perfil"
+                            aria-label="Configurar viaje y perfil"
                         >
-                            <Settings className="w-4 h-4 text-zinc-200" />
+                            <Settings className="w-5 h-5 text-zinc-200" />
                         </button>
 
                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-300 bg-zinc-950/70 backdrop-blur-md px-2.5 py-1.5 rounded-full border border-emerald-500/30 shadow-md">

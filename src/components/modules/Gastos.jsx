@@ -337,7 +337,7 @@ const GastosYBalancesSection = () => {
                             Monto ({monedaDestino})
                         </label>
                         <div className="relative">
-                            <span className="text-xs font-bold text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2">
+                            <span className="pointer-events-none select-none text-xs font-bold text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2">
                                 {simboloDestino}
                             </span>
                             <input
@@ -346,7 +346,7 @@ const GastosYBalancesSection = () => {
                                 value={montoTexto}
                                 onChange={(e) => setMontoTexto(e.target.value)}
                                 placeholder="Ej: 40.000"
-                                className="w-full pl-9 pr-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-white text-xs font-bold focus:outline-none focus:border-emerald-500"
+                                className="w-full pl-12 pr-3.5 py-2.5 bg-zinc-950 border border-zinc-800 rounded-xl text-white text-xs font-bold focus:outline-none focus:border-emerald-500"
                                 required
                             />
                         </div>
