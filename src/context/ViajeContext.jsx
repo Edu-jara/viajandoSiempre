@@ -6,6 +6,7 @@ const ViajeContext = createContext();
 
 const VIAJE_DOC_REF = doc(db, 'viajes', 'viaje-grupal-principal');
 const PORTADA_DEFAULT = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=600&auto=format&fit=crop';
+const MAX_HISTORIAL_ELIMINADOS = 10;
 
 const normalizarUsuario = (raw = {}, fallbackId = Date.now()) => ({
     id: raw.id || fallbackId,
@@ -28,6 +29,12 @@ const normalizarParticipante = (raw = {}) => ({
     fotoPerfil: raw.fotoPerfil || ''
 });
 
+const normalizarCotizacion = (valor, destino, origen) => {
+    if ((destino || 'ARS') === (origen || 'USD')) return 1;
+    const num = Number(valor);
+    return Number.isFinite(num) && num > 0 ? num : 1;
+};
+
 export const ViajeProvider = ({ children }) => {
     const [usuarioLocal, setUsuarioLocal] = useState(() => {
         try {
@@ -41,7 +48,11 @@ export const ViajeProvider = ({ children }) => {
 
     const [nombreViaje, setNombreViaje] = useState('Mendoza 2026');
     const [portadaViaje, setPortadaViaje] = useState(PORTADA_DEFAULT);
+    const [monedaDestino, setMonedaDestino] = useState('ARS');
+    const [monedaOrigen, setMonedaOrigen] = useState('USD');
+    const [cotizacion, setCotizacion] = useState(1);
     const [gastosList, setGastosList] = useState([]);
+    const [gastosEliminados, setGastosEliminados] = useState([]);
     const [participantesList, setParticipantesList] = useState([]);
     const [isConfigOpen, setIsConfigOpen] = useState(false);
 
@@ -51,7 +62,17 @@ export const ViajeProvider = ({ children }) => {
                 const data = docSnap.data();
                 if (data.nombreViaje !== undefined) setNombreViaje(data.nombreViaje);
                 if (data.portadaViaje !== undefined) setPortadaViaje(data.portadaViaje);
+
+                const destinoDoc = data.monedaDestino || 'ARS';
+                const origenDoc = data.monedaOrigen || 'USD';
+                setMonedaDestino(destinoDoc);
+                setMonedaOrigen(origenDoc);
+                if (data.cotizacion !== undefined) {
+                    setCotizacion(normalizarCotizacion(data.cotizacion, destinoDoc, origenDoc));
+                }
+
                 setGastosList(Array.isArray(data.gastos) ? data.gastos : []);
+                setGastosEliminados(Array.isArray(data.gastosEliminados) ? data.gastosEliminados : []);
                 setParticipantesList(
                     Array.isArray(data.participantes)
                         ? data.participantes.map(normalizarParticipante)
@@ -61,7 +82,11 @@ export const ViajeProvider = ({ children }) => {
                 setDoc(VIAJE_DOC_REF, {
                     nombreViaje: 'Mendoza 2026',
                     portadaViaje: PORTADA_DEFAULT,
+                    monedaDestino: 'ARS',
+                    monedaOrigen: 'USD',
+                    cotizacion: 1,
                     gastos: [],
+                    gastosEliminados: [],
                     participantes: []
                 });
             }
@@ -75,12 +100,22 @@ export const ViajeProvider = ({ children }) => {
     const viajeState = {
         nombreViaje,
         portadaViaje,
+        monedaDestino,
+        monedaOrigen,
+        cotizacion,
         usuario: usuarioLocal
     };
 
     const guardarConfiguracion = async (nuevosDatos) => {
-        const nombreLimpio = (nuevosDatos.nombreViaje ?? nombreViaje);
-        const portadaLimpia = (nuevosDatos.portadaViaje ?? portadaViaje);
+        const nombreLimpio = nuevosDatos.nombreViaje ?? nombreViaje;
+        const portadaLimpia = nuevosDatos.portadaViaje ?? portadaViaje;
+        const destinoLimpio = nuevosDatos.monedaDestino ?? monedaDestino ?? 'ARS';
+        const origenLimpio = nuevosDatos.monedaOrigen ?? monedaOrigen ?? 'USD';
+        const cotizacionLimpia = normalizarCotizacion(
+            nuevosDatos.cotizacion ?? cotizacion,
+            destinoLimpio,
+            origenLimpio
+        );
 
         let usuarioActualizado = usuarioLocal;
         if (nuevosDatos.usuario) {
@@ -94,7 +129,10 @@ export const ViajeProvider = ({ children }) => {
 
         const payload = {
             nombreViaje: nombreLimpio,
-            portadaViaje: portadaLimpia
+            portadaViaje: portadaLimpia,
+            monedaDestino: destinoLimpio,
+            monedaOrigen: origenLimpio,
+            cotizacion: cotizacionLimpia
         };
 
         if (usuarioActualizado?.nombre) {
@@ -110,6 +148,9 @@ export const ViajeProvider = ({ children }) => {
 
         setNombreViaje(nombreLimpio);
         setPortadaViaje(portadaLimpia);
+        setMonedaDestino(destinoLimpio);
+        setMonedaOrigen(origenLimpio);
+        setCotizacion(cotizacionLimpia);
 
         await setDoc(VIAJE_DOC_REF, payload, { merge: true });
     };
@@ -151,6 +192,7 @@ export const ViajeProvider = ({ children }) => {
 
         const gastoNormalizado = {
             ...nuevoGasto,
+            id: nuevoGasto?.id || `gasto_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
             pagadoPor: pagadorNombre || nuevoGasto?.pagadoPor || ''
         };
 
@@ -164,6 +206,91 @@ export const ViajeProvider = ({ children }) => {
             {
                 gastos: nuevaListaGastos,
                 participantes: participantesActualizados
+            },
+            { merge: true }
+        );
+    };
+
+    const eliminarGasto = async (gastoId, gastoFallback = null, indiceGlobal = -1) => {
+        const listaActual = Array.isArray(gastosList) ? gastosList : [];
+        if (listaActual.length === 0) return;
+
+        const existePorId = gastoId !== undefined && gastoId !== null && gastoId !== ''
+            ? listaActual.some((g) => g?.id === gastoId)
+            : false;
+
+        let gastoEliminadoObj = null;
+        const nuevaListaGastos = listaActual.filter((g, idx) => {
+            const esElBuscado = existePorId
+                ? g?.id === gastoId
+                : (gastoFallback && g === gastoFallback) || (indiceGlobal >= 0 && idx === indiceGlobal);
+
+            if (esElBuscado && !gastoEliminadoObj) {
+                gastoEliminadoObj = g;
+                return false;
+            }
+            return true;
+        });
+
+        if (!gastoEliminadoObj || nuevaListaGastos.length === listaActual.length) return;
+
+        const quienBorro = (usuarioLocal?.apodo || usuarioLocal?.nombre || '').trim();
+        const ahora = new Date();
+        const horaStr = ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+        const fechaStr = ahora.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' });
+
+        const registroEliminado = {
+            ...gastoEliminadoObj,
+            id: gastoEliminadoObj.id || `gasto_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            eliminadoId: `del_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            eliminadoPor: quienBorro,
+            eliminadoEl: `${fechaStr} ${horaStr}`
+        };
+
+        const historialActualizado = [
+            registroEliminado,
+            ...(Array.isArray(gastosEliminados) ? gastosEliminados : [])
+        ].slice(0, MAX_HISTORIAL_ELIMINADOS);
+
+        setGastosList(nuevaListaGastos);
+        setGastosEliminados(historialActualizado);
+
+        await setDoc(
+            VIAJE_DOC_REF,
+            {
+                gastos: nuevaListaGastos,
+                gastosEliminados: historialActualizado
+            },
+            { merge: true }
+        );
+    };
+
+    const restaurarGasto = async (itemEliminado) => {
+        if (!itemEliminado) return;
+
+        const { eliminadoId, eliminadoPor, eliminadoEl, ...gastoOriginal } = itemEliminado;
+        const gastoRestaurado = {
+            ...gastoOriginal,
+            id: gastoOriginal.id || `gasto_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`
+        };
+
+        const listaActual = Array.isArray(gastosList) ? gastosList : [];
+        const yaExiste = listaActual.some((g) => g?.id === gastoRestaurado.id);
+        const nuevaListaGastos = yaExiste ? listaActual : [gastoRestaurado, ...listaActual];
+
+        const historialActual = Array.isArray(gastosEliminados) ? gastosEliminados : [];
+        const nuevoHistorial = historialActual.filter((item) =>
+            eliminadoId ? item.eliminadoId !== eliminadoId : item !== itemEliminado
+        );
+
+        setGastosList(nuevaListaGastos);
+        setGastosEliminados(nuevoHistorial);
+
+        await setDoc(
+            VIAJE_DOC_REF,
+            {
+                gastos: nuevaListaGastos,
+                gastosEliminados: nuevoHistorial
             },
             { merge: true }
         );
@@ -225,13 +352,18 @@ export const ViajeProvider = ({ children }) => {
             await setDoc(VIAJE_DOC_REF, {
                 nombreViaje: nombreLimpio,
                 portadaViaje: PORTADA_DEFAULT,
+                monedaDestino,
+                monedaOrigen,
+                cotizacion,
                 gastos: [],
+                gastosEliminados: [],
                 participantes: participantesIniciales
             });
 
             setNombreViaje(nombreLimpio);
             setPortadaViaje(PORTADA_DEFAULT);
             setGastosList([]);
+            setGastosEliminados([]);
             setParticipantesList(participantesIniciales);
 
             localStorage.removeItem('viaje_state');
@@ -263,10 +395,9 @@ export const ViajeProvider = ({ children }) => {
                 if (!pagadorGasto) return false;
 
                 return (
-                    pagadorGasto === nombreCompleto ||
-                    pagadorGasto === soloNombre ||
-                    pagadorGasto === apodo ||
-                    (soloNombre && pagadorGasto.includes(soloNombre))
+                    (nombreCompleto && pagadorGasto === nombreCompleto) ||
+                    (soloNombre && pagadorGasto === soloNombre) ||
+                    (apodo && pagadorGasto === apodo)
                 );
             })
             .reduce((sum, gasto) => sum + Number(gasto.monto || 0), 0);
@@ -323,6 +454,7 @@ export const ViajeProvider = ({ children }) => {
         <ViajeContext.Provider value={{
             viajeState,
             gastosList,
+            gastosEliminados,
             participantes: participantesList,
             totalGastos,
             cuotaPorPersona,
@@ -332,6 +464,8 @@ export const ViajeProvider = ({ children }) => {
             setIsConfigOpen,
             guardarConfiguracion,
             agregarGasto,
+            eliminarGasto,
+            restaurarGasto,
             agregarParticipante,
             sincronizarUsuarioEnGrupo,
             reiniciarViaje,

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Camera, MapPin, User, Check, Compass, Users, UserPlus, RotateCcw } from 'lucide-react';
 import { useViaje } from '../../context/ViajeContext';
 import { subirImagenACloudinary } from '../../utils/cloudinary';
+import ConfigMonedas from './ConfigMonedas';
 
 const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
     const {
@@ -14,6 +15,9 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
     const defaultFormData = {
         nombreViaje: '',
         portadaViaje: '',
+        monedaDestino: 'ARS', // Moneda del país donde vacacionan
+        monedaOrigen: 'USD',  // Moneda de origen del usuario
+        cotizacion: 1,        // 1 monedaOrigen = X monedaDestino
         usuario: {
             id: `user_${Date.now()}`,
             nombre: '',
@@ -28,6 +32,9 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
     const [formData, setFormData] = useState(() => ({
         ...defaultFormData,
         ...(viajeState || {}),
+        monedaDestino: viajeState?.monedaDestino || defaultFormData.monedaDestino,
+        monedaOrigen: viajeState?.monedaOrigen || defaultFormData.monedaOrigen,
+        cotizacion: viajeState?.cotizacion ?? defaultFormData.cotizacion,
         usuario: {
             ...defaultFormData.usuario,
             ...(viajeState?.usuario || {})
@@ -46,7 +53,6 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
     const [nombreNuevoViaje, setNombreNuevoViaje] = useState('');
     const [isEditandoPerfil, setIsEditandoPerfil] = useState(false);
 
-    // 2. TODAS LAS REFERENCIAS (useRef) AL PRINCIPIO
     const fileInputPortadaRef = useRef(null);
     const fileInputPerfilRef = useRef(null);
     const fileInputAmigoRef = useRef(null);
@@ -58,6 +64,9 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
             setFormData({
                 ...defaultFormData,
                 ...(viajeState || {}),
+                monedaDestino: viajeState?.monedaDestino || defaultFormData.monedaDestino,
+                monedaOrigen: viajeState?.monedaOrigen || defaultFormData.monedaOrigen,
+                cotizacion: viajeState?.cotizacion ?? defaultFormData.cotizacion,
                 usuario: {
                     ...defaultFormData.usuario,
                     ...(viajeState?.usuario || {})
@@ -195,6 +204,22 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                 });
             }
 
+            const destinoFinal = formData?.monedaDestino || 'ARS';
+            const origenFinal = formData?.monedaOrigen || 'USD';
+            const cotizacionNum = Number(formData?.cotizacion);
+            const cotizacionFinal =
+                destinoFinal === origenFinal
+                    ? 1
+                    : Number.isFinite(cotizacionNum) && cotizacionNum > 0
+                        ? cotizacionNum
+                        : 1;
+
+            const datosMoneda = {
+                monedaDestino: destinoFinal,
+                monedaOrigen: origenFinal,
+                cotizacion: cotizacionFinal
+            };
+
             const usuarioActual = formData?.usuario;
 
             if (usuarioActual?.nombre && usuarioActual.nombre.trim() !== '') {
@@ -213,6 +238,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
 
                 const viajeActualizado = {
                     ...formData,
+                    ...datosMoneda,
                     usuario: usuarioConId
                 };
 
@@ -225,7 +251,10 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                 }
             } else {
                 if (typeof onGuardar === 'function') {
-                    await onGuardar(formData);
+                    await onGuardar({
+                        ...formData,
+                        ...datosMoneda
+                    });
                 }
             }
 
@@ -324,6 +353,20 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                     )}
                                 </div>
                             </div>
+
+                            <ConfigMonedas
+                                monedaDestino={formData?.monedaDestino || 'ARS'}
+                                monedaOrigen={formData?.monedaOrigen || 'USD'}
+                                cotizacion={formData?.cotizacion ?? 1}
+                                onChange={({ monedaDestino, monedaOrigen, cotizacion }) =>
+                                    setFormData((prev) => ({
+                                        ...prev,
+                                        monedaDestino,
+                                        monedaOrigen,
+                                        cotizacion
+                                    }))
+                                }
+                            />
                         </div>
 
                         {/* SECCIÓN 2: PERFIL DE USUARIO */}
@@ -441,13 +484,13 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                             />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Alias para transferencias</label>
+                                            <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider">Dato de cobro</label>
                                             <input
                                                 type="text"
                                                 name="alias"
                                                 value={formData?.usuario?.alias || ''}
                                                 onChange={handleChange}
-                                                placeholder="Ej: eduardo.73.jara"
+                                                placeholder="Alias, @usuario, cel, email o IBAN"
                                                 className="w-full px-3.5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-emerald-500"
                                             />
                                         </div>
@@ -460,7 +503,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                             name="descripcion"
                                             value={formData?.usuario?.descripcion || ''}
                                             onChange={handleChange}
-                                            placeholder="Ej: Banco Provincia, Mercado Pago, Cuenta DNI..."
+                                            placeholder="Ej: Banco Provincia, Mercado Pago, Venmo, Zelle..."
                                             className="w-full px-3.5 py-3 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-emerald-500"
                                         />
                                     </div>
@@ -546,7 +589,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                         type="text"
                                         value={nuevoAmigo.alias || ''}
                                         onChange={(e) => setNuevoAmigo(prev => ({ ...prev, alias: e.target.value }))}
-                                        placeholder="Alias (Ej: eduardo.73.jara)"
+                                        placeholder="Dato de cobro (@usuario, alias, cel...)"
                                         className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-amber-500"
                                     />
                                 </div>
@@ -555,7 +598,7 @@ const ConfiguracionModal = ({ isOpen, onClose, viajeState, onGuardar }) => {
                                     type="text"
                                     value={nuevoAmigo.descripcion || ''}
                                     onChange={(e) => setNuevoAmigo(prev => ({ ...prev, descripcion: e.target.value }))}
-                                    placeholder="Descripción (Ej: Banco Provincia, MP...)"
+                                    placeholder="Descripción (Ej: Banco Provincia, MP, Venmo...)"
                                     className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-white text-xs font-medium focus:outline-none focus:border-amber-500"
                                 />
 
