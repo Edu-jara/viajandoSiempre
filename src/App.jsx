@@ -11,7 +11,7 @@ import FinanzasContainer from './components/modules/FinanzasContainer';
 // 1. Componente interno de la interfaz (Ya puede usar useViaje libremente)
 const DashboardContent = () => {
   const [activeTab, setActiveTab] = useState('gastos');
-  
+
   // Extraemos del contexto global lo que necesitamos
   const { viajeState, isConfigOpen, setIsConfigOpen, guardarConfiguracion } = useViaje();
 
@@ -26,9 +26,9 @@ const DashboardContent = () => {
 
   return (
     <>
-      <Layout 
-        activeTab={activeTab} 
-        setActiveTab={setActiveTab} 
+      <Layout
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
         viajeState={viajeState}
         onAbrirConfig={() => {
           console.log("🚀 ¡El botón del Header fue presionado! Abriendo modal...");
@@ -36,11 +36,17 @@ const DashboardContent = () => {
         }}
       >
         {activeTab === 'gastos' && <FinanzasContainer />}
-        {activeTab === 'conversor' && <Conversor />}
+        {activeTab === 'conversor' && (
+          <Conversor
+            monedaDestino={viajeState?.monedaDestino || viajeState?.moneda || 'ARS'}
+            monedaOrigen={viajeState?.monedaOrigen || 'USD'}
+            cotizacionViaje={viajeState?.cotizacion || 1}
+          />
+        )}
         {activeTab === 'seguridad' && <Seguridad />}
       </Layout>
 
-      <ConfiguracionModal 
+      <ConfiguracionModal
         isOpen={isConfigOpen}
         onClose={() => setIsConfigOpen(false)}
         viajeState={viajeState}
