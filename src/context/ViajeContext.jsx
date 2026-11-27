@@ -55,6 +55,7 @@ export const ViajeProvider = ({ children }) => {
     const [gastosEliminados, setGastosEliminados] = useState([]);
     const [participantesList, setParticipantesList] = useState([]);
     const [isConfigOpen, setIsConfigOpen] = useState(false);
+    const [ubicacionesMap, setUbicacionesMap] = useState({});
 
     useEffect(() => {
         const unsubscribe = onSnapshot(VIAJE_DOC_REF, (docSnap) => {
@@ -78,6 +79,9 @@ export const ViajeProvider = ({ children }) => {
                         ? data.participantes.map(normalizarParticipante)
                         : []
                 );
+                setUbicacionesMap(
+                    data.ubicaciones && typeof data.ubicaciones === 'object' ? data.ubicaciones : {}
+                );
             } else {
                 setDoc(VIAJE_DOC_REF, {
                     nombreViaje: 'Mendoza 2026',
@@ -87,7 +91,8 @@ export const ViajeProvider = ({ children }) => {
                     cotizacion: 1,
                     gastos: [],
                     gastosEliminados: [],
-                    participantes: []
+                    participantes: [],
+                    ubicaciones: {}
                 });
             }
         }, (error) => {
@@ -103,7 +108,8 @@ export const ViajeProvider = ({ children }) => {
         monedaDestino,
         monedaOrigen,
         cotizacion,
-        usuario: usuarioLocal
+        usuario: usuarioLocal,
+        ubicaciones: ubicacionesMap
     };
 
     const guardarConfiguracion = async (nuevosDatos) => {
@@ -324,6 +330,35 @@ export const ViajeProvider = ({ children }) => {
         setParticipantesList(nuevaLista);
         await setDoc(VIAJE_DOC_REF, { participantes: nuevaLista }, { merge: true });
     };
+    const actualizarUbicacionIntegrante = async (participanteId, datosUbicacion) => {
+    const idFinal = participanteId || usuarioLocal?.id;
+    if (!idFinal || !datosUbicacion) return;
+
+    const latNum = Number(datosUbicacion.lat);
+    const lngNum = Number(datosUbicacion.lng);
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return;
+
+    const siguienteMapa = {
+        ...ubicacionesMap,
+        [idFinal]: {
+            lat: latNum,
+            lng: lngNum,
+            precision: datosUbicacion.precision ?? null,
+            hora:
+                datosUbicacion.hora ||
+                new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+            actualizadoEn: datosUbicacion.actualizadoEn || Date.now()
+        }
+    };
+
+    setUbicacionesMap(siguienteMapa);
+
+    await setDoc(
+        VIAJE_DOC_REF,
+        { ubicaciones: siguienteMapa },
+        { merge: true }
+    );
+};
 
     // Reinicia gastos y participantes en Firestore, manteniendo al usuario actual si ya tiene perfil
     const reiniciarViaje = async (nuevoNombre = 'Nuevo Viaje') => {
@@ -357,7 +392,8 @@ export const ViajeProvider = ({ children }) => {
                 cotizacion,
                 gastos: [],
                 gastosEliminados: [],
-                participantes: participantesIniciales
+                participantes: participantesIniciales,
+                ubicaciones: {}
             });
 
             setNombreViaje(nombreLimpio);
@@ -461,6 +497,8 @@ export const ViajeProvider = ({ children }) => {
             balanceParticipantes,
             pagosSugeridos,
             isConfigOpen,
+            ubicaciones: ubicacionesMap,
+            actualizarUbicacionIntegrante,
             setIsConfigOpen,
             guardarConfiguracion,
             agregarGasto,
@@ -469,6 +507,7 @@ export const ViajeProvider = ({ children }) => {
             agregarParticipante,
             sincronizarUsuarioEnGrupo,
             reiniciarViaje,
+
         }}>
             {children}
         </ViajeContext.Provider>
